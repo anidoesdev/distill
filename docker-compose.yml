@@ -1,0 +1,27 @@
+services:
+  # vLLM model server — spun up in session 22
+  # vllm:
+  #   image: vllm/vllm-openai:latest
+  #   runtime: nvidia
+  #   environment:
+  #     - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
+  #   command: >
+  #     --model checkpoints/extractor-dpo-awq
+  #     --quantization awq
+  #     --max-model-len 4096
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./checkpoints:/checkpoints
+
+  extractor-api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VLLM_HOST=vllm
+      - VLLM_PORT=8000
+      - LOG_LEVEL=info
+    # depends_on:
+    #   - vllm
+    restart: unless-stopped

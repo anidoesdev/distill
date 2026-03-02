@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+pip-wheel-metadata/
+
+# Environment
+.env
+.env.local
+*.env
+
+# Data — large files never go in git
+data/raw/*.jsonl
+data/raw/*.json
+data/raw/*.parquet
+data/processed/*.jsonl
+data/processed/*.json
+data/processed/*.parquet
+data/eval/*.jsonl
+
+# Model artifacts
+*.bin
+*.safetensors
+*.gguf
+*.awq
+checkpoints/
+runs/
+outputs/
+
+# Experiment tracking
+wandb/
+mlruns/
+.neptune/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Docker
+.docker/

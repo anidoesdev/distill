@@ -1,0 +1,36 @@
+# ── Core ML ───────────────────────────────────────────────────────────────────
+torch==2.6.0
+transformers==4.49.0
+peft==0.15.0
+trl==0.13.0
+accelerate==1.4.0
+bitsandbytes==0.46.0
+datasets==3.3.0
+tokenizers==0.21.0
+sentencepiece==0.2.0
+
+# ── Experiment tracking ────────────────────────────────────────────────────────
+wandb==0.19.5
+
+# ── Serving ───────────────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.7.0
+vllm==0.8.3
+outlines==0.1.11
+
+# ── Data / compute ────────────────────────────────────────────────────────────
+numpy==2.2.0
+scipy==1.15.0
+scikit-learn==1.6.0
+pandas==2.2.3
+pyarrow==18.1.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+rich==13.9.4
+typer==0.15.1
+httpx==0.28.1
+tenacity==9.0.0
+orjson==3.10.12

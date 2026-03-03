@@ -7,18 +7,35 @@ import os
 from pathlib import Path
 
 def run(cmd, env=None, check=True):
+    """Run a shell command. Use only for commands without paths."""
     r = subprocess.run(cmd, shell=True, capture_output=True, text=True, env=env)
     if check and r.returncode != 0:
         print(f"FAILED: {cmd}\n{r.stderr}", file=sys.stderr)
         sys.exit(1)
     return r.stdout.strip()
 
+def git_run(args, env=None, check=True):
+    """Run a git command with args as a list. Safe for paths with dots, spaces, etc."""
+    r = subprocess.run(["git"] + args, capture_output=True, text=True, env=env)
+    if check and r.returncode != 0:
+        print(f"FAILED: git {' '.join(args)}\n{r.stderr}", file=sys.stderr)
+        sys.exit(1)
+    return r.stdout.strip()
+
 def get_changed_files():
-    out = run("git status --porcelain")
+    """Return list of (status, path) using null-terminated output for safety."""
+    r = subprocess.run(
+        ["git", "status", "--porcelain", "-z"],
+        capture_output=True, text=True, check=True
+    )
     files = []
-    for line in out.splitlines():
-        if line.strip():
-            files.append((line[:2].strip(), line[3:].strip()))
+    for entry in r.stdout.split("\0"):
+        if not entry:
+            continue
+        status = entry[:2].strip()
+        path = entry[3:]
+        if path:
+            files.append((status, path))
     return files
 
 def make_commit_message(bucket, session):
@@ -48,7 +65,7 @@ def main():
     data = json.loads(Path("schedule.json").read_text())
     date_str = data["sessions"][str(args.session)]
     day_info = data["days"][date_str]
-    
+
     files = get_changed_files()
     if not files:
         print(f"No changes to commit for session {args.session} ({date_str}).")
@@ -57,9 +74,13 @@ def main():
     n_commits = max(1, day_info["n_commits"] // 2) if args.partial else day_info["n_commits"]
     timestamps = day_info["timestamps"][:n_commits]
 
+    # If we have fewer files than commits, cap commits at file count
+    n_commits = min(n_commits, len(files))
+    timestamps = timestamps[:n_commits]
+
     print(f"Session {args.session} → {date_str} ({day_info['weekday']}): {len(files)} files → {n_commits} commits")
 
-    # Split files into n_commits buckets
+    # Split files into buckets
     buckets = [[] for _ in range(n_commits)]
     for i, f in enumerate(files):
         buckets[i % n_commits].append(f)
@@ -67,29 +88,32 @@ def main():
     for bucket, ts in zip(buckets, timestamps):
         if not bucket:
             continue
-        run("git reset")
+        # Unstage everything first
+        git_run(["reset"])
+        # Stage just this bucket's files
         for status, path in bucket:
             if status == "D":
-                run(f'git rm "{path}"', check=False)
+                git_run(["rm", "--", path], check=False)
             else:
-                run(f'git add "{path}"')
+                git_run(["add", "--", path])
         msg = make_commit_message(bucket, args.session)
         env = os.environ.copy()
         env["GIT_AUTHOR_DATE"] = ts
         env["GIT_COMMITTER_DATE"] = ts
-        run(f'git commit -m "{msg}"', env=env)
+        git_run(["commit", "-m", msg], env=env)
         print(f"  ✓ {ts}  {msg}")
 
+    # Catch any leftover files
     remaining = get_changed_files()
     if remaining:
         last_ts = timestamps[-1]
         env = os.environ.copy()
         env["GIT_AUTHOR_DATE"] = last_ts
         env["GIT_COMMITTER_DATE"] = last_ts
-        run("git add -A")
-        run(f'git commit -m "chore: session {args.session} remaining"', env=env)
+        git_run(["add", "-A"])
+        git_run(["commit", "-m", f"chore: session {args.session} remaining"], env=env)
+        print(f"  ✓ {last_ts}  remaining files")
 
-    next_day = date_str  # for the verify command, show same day
     print(f"\nVerify: git log --since='{date_str} 00:00' --until='{date_str} 23:59' --oneline")
 
 if __name__ == "__main__":

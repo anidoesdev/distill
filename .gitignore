@@ -27,6 +27,9 @@ data/processed/*.jsonl
 data/processed/*.json
 data/processed/*.parquet
 data/eval/*.jsonl
+# Generated eval outputs (keep data/eval/sample_sections.json in git)
+data/eval/baseline_results.json
+data/eval/model_comparison.json
 
 # Model artifacts
 *.bin

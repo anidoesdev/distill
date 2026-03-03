@@ -1,0 +1,72 @@
+[
+  {
+    "paper_id": "sample_001",
+    "title": "Attention Is All You Need",
+    "section": "abstract_and_methods",
+    "text": "We propose the Transformer, a model architecture eschewing recurrence and instead relying entirely on an attention mechanism to draw global dependencies between input and output. The Transformer allows for significantly more parallelization and can reach a new state of the art in translation quality after being trained for as little as twelve hours on eight P100 GPUs. We trained on the standard WMT 2014 English-German dataset consisting of about 4.5 million sentence pairs and the WMT 2014 English-French dataset consisting of 36M sentences. We used byte-pair encoding with a shared source-target vocabulary of about 37000 tokens. We evaluated using beam search with a beam size of 4 and length penalty alpha=0.6. The primary limitation of this approach is that self-attention has quadratic complexity in sequence length, which makes processing very long documents expensive. We did not evaluate on documents longer than 512 tokens due to memory constraints. Statistical significance was evaluated using bootstrap resampling with p < 0.001.",
+    "expected": {
+      "authors": ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones", "Aidan N. Gomez", "Lukasz Kaiser", "Illia Polosukhin"],
+      "methodology": "Transformer architecture using multi-head self-attention without recurrence or convolution, trained with Adam optimizer and label smoothing",
+      "datasets_used": ["WMT 2014 English-German", "WMT 2014 English-French"],
+      "key_findings": ["Transformer achieves 28.4 BLEU on EN-DE translation", "Trained in 12 hours on 8 P100 GPUs", "Outperforms all previous architectures including ensembles"],
+      "limitations": ["Quadratic complexity in sequence length", "Memory constraints limit sequences beyond 512 tokens"],
+      "statistical_tests": ["bootstrap resampling", "p < 0.001"]
+    }
+  },
+  {
+    "paper_id": "sample_002",
+    "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+    "section": "abstract_and_methods",
+    "text": "We introduce BERT, which stands for Bidirectional Encoder Representations from Transformers. Unlike recent language representation models, BERT is designed to pre-train deep bidirectional representations from unlabeled text by jointly conditioning on both left and right context in all layers. BERT is pre-trained on BooksCorpus (800M words) and English Wikipedia (2,500M words). We use a masked language modeling objective where 15% of tokens are randomly masked. We evaluate on GLUE, SQuAD v1.1, SQuAD v2.0, and SWAG benchmarks. BERT-Large achieves 93.2% on SQuAD 2.0 and 86.7% on GLUE, outperforming previous methods by a large margin. A limitation of our approach is that the masked language model objective creates a mismatch between pre-training and fine-tuning since the [MASK] token does not appear during fine-tuning. McNemar's test was used for statistical significance testing.",
+    "expected": {
+      "authors": ["Jacob Devlin", "Ming-Wei Chang", "Kenton Lee", "Kristina Toutanova"],
+      "methodology": "Bidirectional transformer pre-trained with masked language modeling (MLM) and next sentence prediction (NSP) objectives",
+      "datasets_used": ["BooksCorpus", "English Wikipedia", "GLUE", "SQuAD v1.1", "SQuAD v2.0", "SWAG"],
+      "key_findings": ["BERT-Large achieves 93.2% on SQuAD 2.0", "86.7% on GLUE benchmark", "Bidirectional context improves over unidirectional models"],
+      "limitations": ["[MASK] token mismatch between pre-training and fine-tuning", "Pre-training is computationally expensive"],
+      "statistical_tests": ["McNemar's test"]
+    }
+  },
+  {
+    "paper_id": "sample_003",
+    "title": "LoRA: Low-Rank Adaptation of Large Language Models",
+    "section": "methods_and_results",
+    "text": "We propose Low-Rank Adaptation (LoRA), which freezes the pre-trained model weights and injects trainable rank decomposition matrices into each layer of the Transformer architecture. For a pre-trained weight matrix W in R^{d x k}, we constrain its update by representing it with a low-rank decomposition W + BA where B is in R^{d x r} and A is in R^{r x k}, with rank r << min(d, k). We apply LoRA to GPT-3 175B and evaluate on WikiSQL and MultiNLI. LoRA with r=4 matches or outperforms full fine-tuning while reducing trainable parameters by 10,000x and GPU memory requirement by 3x. Training was performed on 4 A100 80GB GPUs. Limitations include that LoRA does not reduce inference latency when adapters are not merged back into the base weights. We report mean accuracy over three random seeds; paired t-test with p < 0.05 was used for significance testing.",
+    "expected": {
+      "authors": ["Edward J. Hu", "Yelong Shen", "Phillip Wallis", "Zeyuan Allen-Zhu", "Yuanzhi Li", "Shean Wang", "Lu Wang", "Weizhu Chen"],
+      "methodology": "Low-rank decomposition of weight update matrices, freezing pretrained weights and training only the low-rank adapter matrices A and B",
+      "datasets_used": ["WikiSQL", "MultiNLI"],
+      "key_findings": ["Matches full fine-tuning with 10,000x fewer trainable parameters", "Reduces GPU memory by 3x", "r=4 sufficient for most tasks"],
+      "limitations": ["Does not reduce inference latency unless adapters are merged", "Requires choosing rank r as a hyperparameter"],
+      "statistical_tests": ["paired t-test", "p < 0.05", "three random seeds"]
+    }
+  },
+  {
+    "paper_id": "sample_004",
+    "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+    "section": "abstract_and_experiments",
+    "text": "We introduce Direct Preference Optimization (DPO), a stable, performant, and computationally lightweight algorithm for training language models from human preferences without reinforcement learning. DPO implicitly defines a reward model whose optimal policy can be extracted in closed form, allowing us to solve the standard RLHF problem with only a simple binary cross-entropy objective. We evaluate DPO on sentiment modulation, summarization (TL;DR), and single-turn dialogue (Anthropic HH). DPO uses the Anthropic HH dataset (161K comparisons) and TL;DR dataset (93K examples). DPO matches or exceeds PPO-based methods in all settings while being significantly simpler to implement. A key limitation is that DPO requires paired preference data; it cannot learn from scalar reward signals alone. We report win rates from GPT-4 evaluation across 200 held-out prompts.",
+    "expected": {
+      "authors": ["Rafael Rafailov", "Archit Sharma", "Eric Mitchell", "Stefano Ermon", "Christopher D. Manning", "Chelsea Finn"],
+      "methodology": "DPO: binary cross-entropy loss derived from the closed-form optimal policy for RLHF, eliminates the need for explicit reward model training and RL",
+      "datasets_used": ["Anthropic HH (161K comparisons)", "TL;DR (93K examples)"],
+      "key_findings": ["Matches or exceeds PPO in all evaluated settings", "Simpler implementation than PPO-based RLHF", "No explicit reward model required"],
+      "limitations": ["Requires paired preference data", "Cannot learn from scalar reward signals alone"],
+      "statistical_tests": ["GPT-4 win rate evaluation", "200 held-out prompts"]
+    }
+  },
+  {
+    "paper_id": "sample_005",
+    "title": "QLoRA: Efficient Finetuning of Quantized LLMs",
+    "section": "methods_and_results",
+    "text": "We present QLoRA, an efficient finetuning approach that reduces memory usage enough to finetune a 65B parameter model on a single 48GB GPU while preserving full 16-bit finetuning task performance. QLoRA backpropagates gradients through a frozen, 4-bit quantized pretrained language model into Low Rank Adapters (LoRA). We introduce 4-bit NormalFloat (NF4), a new data type optimal for normally distributed weights, and double quantization to reduce memory footprint. We finetune models on FLAN v2 and evaluate on Vicuna benchmark using GPT-4 scoring. Our best model, Guanaco, outperforms ChatGPT on 99.3% of prompts in human evaluation. Training used a single A100 80GB GPU for 24 hours. Limitations include that 4-bit quantization introduces quantization error and NF4 requires custom CUDA kernels. Human raters evaluated 200 prompts; inter-rater agreement measured by Cohen's kappa.",
+    "expected": {
+      "authors": ["Tim Dettmers", "Artidoro Pagnoni", "Ari Holtzman", "Luke Zettlemoyer"],
+      "methodology": "4-bit NF4 quantization of base model combined with LoRA adapters; double quantization of quantization constants; paged optimizers for memory spikes",
+      "datasets_used": ["FLAN v2", "Vicuna benchmark"],
+      "key_findings": ["65B model finetunable on single 48GB GPU", "Guanaco outperforms ChatGPT on 99.3% of prompts", "NF4 is optimal data type for normally distributed LLM weights"],
+      "limitations": ["4-bit quantization introduces quantization error", "NF4 requires custom CUDA kernels"],
+      "statistical_tests": ["GPT-4 scoring", "human evaluation on 200 prompts", "Cohen's kappa for inter-rater agreement"]
+    }
+  }
+]

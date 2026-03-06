@@ -27,6 +27,10 @@ scikit-learn==1.6.0
 pandas==2.2.3
 pyarrow==18.1.0
 
+# ── Teacher APIs (dataset distillation + evaluation) ──────────────────────────
+openai==1.59.3
+anthropic==0.43.0
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv==1.0.1
 rich==13.9.4

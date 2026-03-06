@@ -30,6 +30,10 @@ data/eval/*.jsonl
 # Generated eval outputs (keep data/eval/sample_sections.json in git)
 data/eval/baseline_results.json
 data/eval/model_comparison.json
+# Distillation outputs — large, not committed (described in data card session 7)
+data/raw/train_raw.jsonl
+data/raw/papers.jsonl
+data/raw/generation_stats.json
 
 # Model artifacts
 *.bin

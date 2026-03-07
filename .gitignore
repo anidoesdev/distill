@@ -34,6 +34,10 @@ data/eval/model_comparison.json
 data/raw/train_raw.jsonl
 data/raw/papers.jsonl
 data/raw/generation_stats.json
+# Processed data — committed only after train/val/test split in session 7
+data/processed/train_clean.jsonl
+data/processed/train_rejected.jsonl
+data/processed/validation_report.json
 
 # Model artifacts
 *.bin

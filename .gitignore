@@ -38,6 +38,9 @@ data/raw/generation_stats.json
 data/processed/train_clean.jsonl
 data/processed/train_rejected.jsonl
 data/processed/validation_report.json
+# Audit tool state — checkpoint is ephemeral, final export is committed
+data/eval/audit_decisions.json
+data/eval/audit_sample.json
 
 # Model artifacts
 *.bin

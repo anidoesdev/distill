@@ -34,11 +34,10 @@ data/eval/model_comparison.json
 data/raw/train_raw.jsonl
 data/raw/papers.jsonl
 data/raw/generation_stats.json
-# Processed data — committed only after train/val/test split in session 7
-data/processed/train_clean.jsonl
-data/processed/train_rejected.jsonl
+# Processed data — JSONL files are large; manifest + audited set are committed
+data/processed/*.jsonl
 data/processed/validation_report.json
-# Audit tool state — checkpoint is ephemeral, final export is committed
+# Audit tool state — checkpoint and sample are ephemeral; human_audited.jsonl is committed
 data/eval/audit_decisions.json
 data/eval/audit_sample.json
 

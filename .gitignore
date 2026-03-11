@@ -34,9 +34,11 @@ data/eval/model_comparison.json
 data/raw/train_raw.jsonl
 data/raw/papers.jsonl
 data/raw/generation_stats.json
-# Processed data — JSONL files are large; manifest + audited set are committed
+# Processed data — JSONL files and HF Dataset binaries are large
 data/processed/*.jsonl
 data/processed/validation_report.json
+data/processed/length_report.json
+data/processed/hf_dataset/
 # Audit tool state — checkpoint and sample are ephemeral; human_audited.jsonl is committed
 data/eval/audit_decisions.json
 data/eval/audit_sample.json

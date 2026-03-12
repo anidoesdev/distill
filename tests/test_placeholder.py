@@ -47,3 +47,50 @@ def test_prompt_builds_correctly() -> None:
 
 def test_splits_module_importable() -> None:
     from extractor.data.splits import load_split, verify_no_leakage  # noqa: F401
+
+
+def test_example_to_messages_structure() -> None:
+    from extractor.data.tokenize import example_to_messages
+    from extractor.prompt import EXTRACTION_SYSTEM_PROMPT
+
+    example = {
+        "section_text": "We trained a model on ImageNet.",
+        "extraction": {
+            "authors": ["Jane Smith"],
+            "methodology": "CNN trained with SGD.",
+            "datasets_used": ["ImageNet"],
+            "key_findings": ["Accuracy 73%."],
+            "limitations": [],
+            "statistical_tests": [],
+        },
+    }
+    messages = example_to_messages(example)
+
+    assert len(messages) == 3
+    assert messages[0]["role"] == "system"
+    assert messages[0]["content"] == EXTRACTION_SYSTEM_PROMPT
+    assert messages[1]["role"] == "user"
+    assert "ImageNet" in messages[1]["content"]
+    assert messages[2]["role"] == "assistant"
+    # Assistant response must be valid JSON
+    import json
+    parsed = json.loads(messages[2]["content"])
+    assert parsed["authors"] == ["Jane Smith"]
+
+
+def test_format_assistant_response_is_compact_json() -> None:
+    from extractor.data.tokenize import format_assistant_response
+
+    extraction = {
+        "authors": ["A", "B"],
+        "methodology": "SVM",
+        "datasets_used": [],
+        "key_findings": ["F1"],
+        "limitations": [],
+        "statistical_tests": [],
+    }
+    result = format_assistant_response(extraction)
+    assert "\n" not in result  # compact, no newlines
+    import json
+    parsed = json.loads(result)
+    assert parsed["authors"] == ["A", "B"]

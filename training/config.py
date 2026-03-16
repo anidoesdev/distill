@@ -68,9 +68,10 @@ class TrainingConfig(BaseModel):
     # ── Data ──────────────────────────────────────────────────────────────────
     hf_dataset_dir: str = "data/processed/hf_dataset"
     packing: bool = Field(
-        default=False,
-        description="Enable sequence packing. Set True in session 11 after smoke test passes. "
-                    "Packing with DataCollatorForCompletionOnlyLM requires TRL >= 0.12.",
+        default=True,
+        description="Sequence packing enabled (confirmed working in session 10 smoke test). "
+                    "Gives ~35-40% throughput improvement when avg seq length << max_seq_length. "
+                    "Requires TRL >= 0.12 for correct interaction with DataCollatorForCompletionOnlyLM.",
     )
 
     # ── Training ──────────────────────────────────────────────────────────────

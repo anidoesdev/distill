@@ -31,6 +31,7 @@ from trl import DataCollatorForCompletionOnlyLM, SFTConfig, SFTTrainer
 from extractor.data.splits import verify_no_leakage
 from extractor.utils.logging import configure_logging, get_logger
 from training.config import TrainingConfig
+from training.utils import TrainingHealthCallback, log_gpu_memory, log_trainable_params
 
 configure_logging("info")
 logger = get_logger(__name__)
@@ -239,6 +240,8 @@ def main() -> None:
     # ── Load model ────────────────────────────────────────────────────────────
     model, tokenizer = load_model_and_tokenizer(cfg)
     model = add_lora_adapters(model, cfg)
+    log_trainable_params(model)
+    log_gpu_memory("after model load")
 
     # ── Load data ─────────────────────────────────────────────────────────────
     train_ds, val_ds = load_datasets(
@@ -249,7 +252,9 @@ def main() -> None:
     # ── Train ─────────────────────────────────────────────────────────────────
     trainer = build_trainer(model, tokenizer, train_ds, val_ds, cfg)
 
+    trainer.add_callback(TrainingHealthCallback(fail_on_nan=True))
     logger.info("starting training")
+    log_gpu_memory("before training")
     train_result = trainer.train()
 
     # ── Save ──────────────────────────────────────────────────────────────────

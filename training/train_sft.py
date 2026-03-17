@@ -178,8 +178,7 @@ def build_trainer(
         fp16=False,
         # Sequence
         max_seq_length=cfg.max_seq_length,
-        # Packing — disabled by default; enable in session 11 after smoke test
-        # packing=cfg.packing,
+        packing=cfg.packing,
         # Logging and checkpointing
         logging_steps=cfg.logging_steps,
         eval_strategy="steps",

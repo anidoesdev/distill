@@ -94,3 +94,98 @@ def test_format_assistant_response_is_compact_json() -> None:
     import json
     parsed = json.loads(result)
     assert parsed["authors"] == ["A", "B"]
+
+
+def _make_result(**kwargs) -> "ExtractionResult":
+    from extractor.schemas.extraction import ExtractionResult
+    defaults = {
+        "authors": [], "methodology": "", "datasets_used": [],
+        "key_findings": [], "limitations": [], "statistical_tests": [],
+    }
+    defaults.update(kwargs)
+    return ExtractionResult(**defaults)
+
+
+def test_per_field_exact_match_perfect() -> None:
+    from extractor.eval.metrics import per_field_exact_match
+
+    pred = _make_result(authors=["Jane Smith"], methodology="CNN trained with SGD.")
+    ref = _make_result(authors=["Jane Smith"], methodology="CNN trained with SGD.")
+    result = per_field_exact_match([pred], [ref])
+    assert result["authors"] == 1.0
+    assert result["methodology"] == 1.0
+
+
+def test_per_field_exact_match_normalization() -> None:
+    from extractor.eval.metrics import per_field_exact_match
+
+    # Case and punctuation differences should still match
+    pred = _make_result(methodology="CNN Trained with SGD!")
+    ref = _make_result(methodology="cnn trained with sgd")
+    result = per_field_exact_match([pred], [ref])
+    assert result["methodology"] == 1.0
+
+
+def test_per_field_exact_match_list_order_invariant() -> None:
+    from extractor.eval.metrics import per_field_exact_match
+
+    pred = _make_result(authors=["Bob", "Alice"])
+    ref = _make_result(authors=["Alice", "Bob"])
+    result = per_field_exact_match([pred], [ref])
+    assert result["authors"] == 1.0
+
+
+def test_per_field_exact_match_partial() -> None:
+    from extractor.eval.metrics import per_field_exact_match
+
+    # Two examples: one correct, one wrong → 0.5
+    pred1 = _make_result(authors=["Alice"])
+    ref1 = _make_result(authors=["Alice"])
+    pred2 = _make_result(authors=["Bob"])
+    ref2 = _make_result(authors=["Alice"])
+    result = per_field_exact_match([pred1, pred2], [ref1, ref2])
+    assert result["authors"] == 0.5
+
+
+def test_list_field_f1_perfect() -> None:
+    from extractor.eval.metrics import list_field_f1
+
+    pred = _make_result(authors=["Alice", "Bob"])
+    ref = _make_result(authors=["Alice", "Bob"])
+    result = list_field_f1([pred], [ref], "authors")
+    assert result["f1"] == 1.0
+    assert result["precision"] == 1.0
+    assert result["recall"] == 1.0
+
+
+def test_list_field_f1_partial_overlap() -> None:
+    from extractor.eval.metrics import list_field_f1
+
+    # pred has 1 correct out of 2 predicted; ref has 2 items
+    pred = _make_result(authors=["Alice", "Charlie"])
+    ref = _make_result(authors=["Alice", "Bob"])
+    result = list_field_f1([pred], [ref], "authors")
+    assert result["precision"] == 0.5   # 1 correct / 2 predicted
+    assert result["recall"] == 0.5      # 1 correct / 2 reference
+    assert abs(result["f1"] - 0.5) < 1e-6
+
+
+def test_list_field_f1_both_empty() -> None:
+    from extractor.eval.metrics import list_field_f1
+
+    pred = _make_result(limitations=[])
+    ref = _make_result(limitations=[])
+    result = list_field_f1([pred], [ref], "limitations")
+    assert result["f1"] == 1.0
+
+
+def test_eval_suite_returns_all_keys() -> None:
+    from extractor.eval.metrics import eval_suite
+
+    pred = _make_result(authors=["Alice"], methodology="SVM")
+    ref = _make_result(authors=["Alice"], methodology="SVM")
+    result = eval_suite([pred], [ref], [None])
+    assert "schema_validity_rate" in result
+    assert "per_field_exact_match" in result
+    assert "list_field_f1" in result
+    assert result["schema_validity_rate"] == 1.0

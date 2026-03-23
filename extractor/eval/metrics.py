@@ -160,11 +160,13 @@ def eval_suite(
 
     Combines validity, exact match, and per-field F1.
     """
+    em = per_field_exact_match(predictions, references)
+    f1s = {f: list_field_f1(predictions, references, f) for f in LIST_FIELDS}
     return {
         "n": len(predictions),
         "schema_validity_rate": round(schema_validity_rate(parse_errors), 4),
-        "per_field_exact_match": per_field_exact_match(predictions, references),
-        "list_field_f1": {
-            f: list_field_f1(predictions, references, f) for f in LIST_FIELDS
-        },
+        "macro_em": round(sum(em.values()) / len(em), 4) if em else 0.0,
+        "macro_f1": round(sum(v["f1"] for v in f1s.values()) / len(f1s), 4) if f1s else 0.0,
+        "per_field_exact_match": em,
+        "list_field_f1": f1s,
     }

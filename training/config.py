@@ -14,6 +14,86 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class DPOConfig(BaseModel):
+    """Hyperparameters for the DPO alignment phase (session 17).
+
+    DPO trains on (prompt, chosen, rejected) triples using the SFT checkpoint
+    as both the starting point and the frozen reference policy.
+    """
+
+    # ── Model ─────────────────────────────────────────────────────────────────
+    model_name: str = "Qwen/Qwen2.5-3B-Instruct"
+    sft_adapter_dir: str = Field(
+        default="checkpoints/sft",
+        description="LoRA adapter from SFT training. Loaded as both the trainable "
+                    "policy and (frozen copy) reference policy.",
+    )
+
+    # ── DPO loss ──────────────────────────────────────────────────────────────
+    beta: float = Field(
+        default=0.1,
+        description="KL temperature. Controls how far the trained policy is allowed "
+                    "to deviate from the SFT reference. "
+                    "Low β (0.01–0.05): aggressive, risk of forgetting. "
+                    "High β (0.5+): conservative, small preference margin. "
+                    "0.1 is the DPO paper default.",
+    )
+    loss_type: Literal["sigmoid", "hinge", "ipo"] = Field(
+        default="sigmoid",
+        description="DPO loss variant. "
+                    "'sigmoid': standard DPO (Rafailov et al. 2023). "
+                    "'ipo': Identity PO, removes the log-sigmoid, more stable. "
+                    "'hinge': max-margin variant, ignores easy pairs.",
+    )
+
+    # ── Data ──────────────────────────────────────────────────────────────────
+    preference_data_path: str = "data/processed/preference_pairs.jsonl"
+    max_prompt_length: int = Field(
+        default=512,
+        description="Max tokens for the prompt portion. Chosen+rejected each get "
+                    "max_seq_length - max_prompt_length tokens.",
+    )
+    max_length: int = Field(
+        default=1024,
+        description="Max total sequence length (prompt + completion).",
+    )
+
+    # ── Training ──────────────────────────────────────────────────────────────
+    num_train_epochs: int = 1
+    per_device_train_batch_size: int = Field(
+        default=2,
+        description="DPO processes chosen+rejected in the same forward pass, "
+                    "so effective memory use is ~2× SFT. Reduce to 1 on T4-16GB.",
+    )
+    gradient_accumulation_steps: int = Field(
+        default=8,
+        description="Effective batch = 2×8 = 16, matching SFT effective batch.",
+    )
+    learning_rate: float = Field(
+        default=5e-5,
+        description="Lower than SFT (2e-4). DPO objective is more sensitive; "
+                    "the SFT reference acts as an implicit regularizer.",
+    )
+    lr_scheduler_type: Literal["cosine", "linear", "constant"] = "cosine"
+    warmup_ratio: float = 0.1
+    weight_decay: float = 0.01
+
+    # ── LoRA ──────────────────────────────────────────────────────────────────
+    lora: "LoRAConfig | None" = None
+
+    # ── Checkpointing ─────────────────────────────────────────────────────────
+    output_dir: str = "checkpoints/dpo"
+    logging_steps: int = 10
+    eval_steps: int = 50
+    save_steps: int = 50
+    save_total_limit: int = 2
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+    use_wandb: bool = True
+    wandb_project: str = "extractor"
+    run_name: str = "extractor-dpo"
+
+
 class LoRAConfig(BaseModel):
     r: int = Field(default=16, description="Rank of the LoRA matrices. Higher = more capacity, more VRAM.")
     lora_alpha: int = Field(

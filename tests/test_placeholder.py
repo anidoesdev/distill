@@ -189,3 +189,82 @@ def test_eval_suite_returns_all_keys() -> None:
     assert "per_field_exact_match" in result
     assert "list_field_f1" in result
     assert result["schema_validity_rate"] == 1.0
+
+
+# ── Degradation tests (session 16) ────────────────────────────────────────────
+
+def _sample_extraction() -> dict:
+    return {
+        "authors": ["Alice Smith", "Bob Jones"],
+        "methodology": "We trained a CNN on ImageNet with SGD.",
+        "datasets_used": ["ImageNet", "CIFAR-10"],
+        "key_findings": ["73% top-1 accuracy", "Outperforms baseline by 5%"],
+        "limitations": ["Not evaluated on out-of-distribution data"],
+        "statistical_tests": ["chi-squared test (p < 0.001)"],
+    }
+
+
+def test_drop_authors_reduces_list() -> None:
+    from extractor.data.degrade import drop_authors
+
+    ex = _sample_extraction()
+    result = drop_authors(ex)
+    assert len(result["authors"]) < len(ex["authors"])
+
+
+def test_truncate_findings_keeps_one() -> None:
+    from extractor.data.degrade import truncate_findings
+
+    ex = _sample_extraction()
+    result = truncate_findings(ex)
+    assert len(result["key_findings"]) == 1
+    assert result["key_findings"][0] == ex["key_findings"][0]
+
+
+def test_clear_field_empties_list() -> None:
+    from extractor.data.degrade import clear_field
+
+    ex = _sample_extraction()
+    result = clear_field(ex, "datasets_used")
+    assert result["datasets_used"] == []
+    assert result["authors"] == ex["authors"]  # other fields unchanged
+
+
+def test_truncate_methodology_shortens() -> None:
+    from extractor.data.degrade import truncate_methodology
+
+    ex = _sample_extraction()
+    result = truncate_methodology(ex, keep_fraction=0.4)
+    original_words = len(ex["methodology"].split())
+    result_words = len(result["methodology"].replace("...", "").split())
+    assert result_words < original_words
+
+
+def test_degrade_returns_different_extraction() -> None:
+    from extractor.data.degrade import degrade
+
+    import random as _random
+    ex = _sample_extraction()
+    degraded, strategy = degrade(ex, rng=_random.Random(42))
+    assert degraded != ex
+    assert isinstance(strategy, str)
+
+
+def test_degrade_composite_applies_multiple() -> None:
+    from extractor.data.degrade import degrade_composite
+
+    import random as _random
+    ex = _sample_extraction()
+    degraded, strategies = degrade_composite(ex, rng=_random.Random(42), n=2)
+    assert len(strategies) == 2
+    assert degraded != ex
+
+
+def test_degrade_preserves_schema_keys() -> None:
+    from extractor.data.degrade import degrade
+
+    import random as _random
+    ex = _sample_extraction()
+    for seed in range(10):
+        degraded, _ = degrade(ex, rng=_random.Random(seed))
+        assert set(degraded.keys()) == set(ex.keys())

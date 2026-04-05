@@ -116,6 +116,140 @@ def analyze_trainer_state(checkpoint_dir: str | Path) -> dict[str, Any]:
     return result
 
 
+def analyze_dpo_trainer_state(checkpoint_dir: str | Path) -> dict[str, Any]:
+    """Read trainer_state.json from a DPO checkpoint and analyze reward margins.
+
+    DPOTrainer logs different keys than SFTTrainer:
+      rewards/chosen    — β × log(π_θ/π_ref) for chosen completions; should increase
+      rewards/rejected  — β × log(π_θ/π_ref) for rejected completions; should decrease
+      rewards/margins   — chosen − rejected; should widen (key health indicator)
+      rewards/accuracies — fraction of batches where chosen margin > rejected; → 1.0
+
+    Returns a dict with margin statistics and a pass/fail assessment.
+    """
+    state_path = next(Path(checkpoint_dir).rglob("trainer_state.json"), None)
+    if not state_path:
+        raise FileNotFoundError(f"trainer_state.json not found in {checkpoint_dir}")
+
+    log_history: list[dict] = json.loads(state_path.read_text()).get("log_history", [])
+
+    def extract_series(key: str) -> list[tuple[int, float]]:
+        return [(e["step"], e[key]) for e in log_history if key in e]
+
+    margins       = extract_series("rewards/margins")
+    chosen_rw     = extract_series("rewards/chosen")
+    rejected_rw   = extract_series("rewards/rejected")
+    accuracies    = extract_series("rewards/accuracies")
+    losses        = extract_series("loss")
+    grad_norms    = extract_series("grad_norm")
+
+    result: dict[str, Any] = {
+        "checkpoint_dir": str(checkpoint_dir),
+        "total_steps": json.loads(state_path.read_text()).get("global_step", 0),
+        "margin_first":      margins[0][1]     if margins       else None,
+        "margin_last":       margins[-1][1]    if margins       else None,
+        "margin_max":        max(v for _, v in margins)   if margins else None,
+        "chosen_rw_last":    chosen_rw[-1][1]  if chosen_rw     else None,
+        "rejected_rw_last":  rejected_rw[-1][1] if rejected_rw  else None,
+        "accuracy_last":     accuracies[-1][1] if accuracies    else None,
+        "accuracy_mean":     sum(v for _, v in accuracies) / len(accuracies) if accuracies else None,
+        "n_nan":             sum(1 for _, v in losses if math.isnan(v)),
+        "grad_norm_max":     max((v for _, v in grad_norms), default=None),
+    }
+
+    checks: dict[str, bool] = {}
+
+    if result["margin_first"] is not None and result["margin_last"] is not None:
+        checks["margin_increased"] = result["margin_last"] > result["margin_first"]
+
+    if result["accuracy_mean"] is not None:
+        # Reward accuracy > 0.6 means the model correctly ranks chosen > rejected
+        # on the majority of training pairs
+        checks["accuracy_above_chance"] = result["accuracy_mean"] > 0.6
+
+    if result["chosen_rw_last"] is not None and result["rejected_rw_last"] is not None:
+        checks["margin_positive"] = result["chosen_rw_last"] > result["rejected_rw_last"]
+
+    checks["no_nan"] = result["n_nan"] == 0
+
+    if result["grad_norm_max"] is not None:
+        checks["grad_norm_reasonable"] = result["grad_norm_max"] < 50.0
+
+    result["checks"] = checks
+    result["passed"] = all(checks.values())
+    return result
+
+
+def print_dpo_report(result: dict[str, Any]) -> None:
+    """Print a human-readable DPO training report."""
+    print("\n" + "=" * 58)
+    print("DPO TRAINING REPORT")
+    print("=" * 58)
+    print(f"  Checkpoint:    {result['checkpoint_dir']}")
+    print(f"  Steps:         {result['total_steps']}")
+    print()
+
+    if result["margin_first"] is not None:
+        delta = (result["margin_last"] or 0) - result["margin_first"]
+        sign = "+" if delta >= 0 else ""
+        print(f"  Reward margin:   {result['margin_first']:.4f} → {result['margin_last']:.4f}  ({sign}{delta:.4f})")
+    if result["chosen_rw_last"] is not None:
+        print(f"  Chosen reward:   {result['chosen_rw_last']:.4f}  (last step)")
+    if result["rejected_rw_last"] is not None:
+        print(f"  Rejected reward: {result['rejected_rw_last']:.4f}  (last step)")
+    if result["accuracy_mean"] is not None:
+        print(f"  Reward accuracy: {result['accuracy_mean']:.3f} mean  /  {result['accuracy_last']:.3f} last")
+    if result["grad_norm_max"] is not None:
+        print(f"  Grad norm max:   {result['grad_norm_max']:.2f}")
+    if result["n_nan"] > 0:
+        print(f"  NaN steps:       {result['n_nan']}  ← CRITICAL FAILURE")
+
+    print()
+    print("  Checks:")
+    for check, passed in result.get("checks", {}).items():
+        icon = "✓" if passed else "✗"
+        print(f"    {icon} {check}")
+
+    print()
+    if result.get("passed"):
+        print("  RESULT: PASS — proceed to DPO eval (session 18)")
+    else:
+        failed = [k for k, v in result.get("checks", {}).items() if not v]
+        print(f"  RESULT: FAIL — fix before proceeding: {failed}")
+    print("=" * 58)
+
+
+def print_ascii_reward_curve(checkpoint_dir: str | Path) -> None:
+    """Print ASCII curve of reward margins from DPO trainer_state.json."""
+    state_path = next(Path(checkpoint_dir).rglob("trainer_state.json"), None)
+    if not state_path:
+        print("No trainer_state.json found.")
+        return
+
+    log_history = json.loads(state_path.read_text()).get("log_history", [])
+    margins = [e["rewards/margins"] for e in log_history if "rewards/margins" in e]
+    if not margins:
+        print("No rewards/margins entries found.")
+        return
+
+    lo, hi = min(margins), max(margins)
+    if lo == hi:
+        print("Reward margins are constant (no learning signal).")
+        return
+
+    rows, cols = 10, min(len(margins), 60)
+    step = max(1, len(margins) // cols)
+    sampled = margins[::step][:cols]
+
+    print("\nReward margin curve (should trend upward):")
+    for row in range(rows, 0, -1):
+        threshold = lo + (hi - lo) * (row / rows)
+        line = "".join("█" if m >= threshold else " " for m in sampled)
+        print(f"  {threshold:6.3f} | {line}")
+    print(f"  {'':>7}  " + "─" * len(sampled))
+    print(f"  {'':>7}  step 1{' ' * (len(sampled) - 12)}step {len(margins)}")
+
+
 def print_smoke_test_report(result: dict[str, Any]) -> None:
     """Print a human-readable smoke test report."""
     print("\n" + "=" * 58)

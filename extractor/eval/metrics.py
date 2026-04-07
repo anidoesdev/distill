@@ -170,3 +170,52 @@ def eval_suite(
         "per_field_exact_match": em,
         "list_field_f1": f1s,
     }
+
+
+def alignment_tax(
+    baseline_metrics: dict,
+    dpo_metrics: dict,
+) -> dict:
+    """Compute per-field delta between a DPO model and a baseline (SFT) model.
+
+    Both arguments are the 'metrics' dict produced by eval_suite (loaded from
+    a result JSON written by eval_sft.py or eval_base_model.py).
+
+    Returns a dict with:
+      - per_field_f1_delta: {field: dpo_f1 - baseline_f1}  (positive = improvement)
+      - macro_f1_delta:     dpo macro_f1 - baseline macro_f1
+      - macro_em_delta:     dpo macro_em - baseline macro_em
+      - regressed_fields:   fields where delta < 0 (alignment tax)
+      - improved_fields:    fields where delta > 0
+    """
+    baseline_f1s = {
+        f: baseline_metrics.get("list_field_f1", {}).get(f, {}).get("f1", 0.0)
+        for f in LIST_FIELDS
+    }
+    dpo_f1s = {
+        f: dpo_metrics.get("list_field_f1", {}).get(f, {}).get("f1", 0.0)
+        for f in LIST_FIELDS
+    }
+
+    deltas = {f: round(dpo_f1s[f] - baseline_f1s[f], 4) for f in LIST_FIELDS}
+
+    baseline_em = {f: baseline_metrics.get("per_field_exact_match", {}).get(f, 0.0) for f in FIELDS}
+    dpo_em = {f: dpo_metrics.get("per_field_exact_match", {}).get(f, 0.0) for f in FIELDS}
+    em_deltas = {f: round(dpo_em[f] - baseline_em[f], 4) for f in FIELDS}
+
+    macro_f1_delta = round(
+        dpo_metrics.get("macro_f1", 0.0) - baseline_metrics.get("macro_f1", 0.0), 4
+    )
+    macro_em_delta = round(
+        dpo_metrics.get("macro_em", 0.0) - baseline_metrics.get("macro_em", 0.0), 4
+    )
+
+    return {
+        "per_field_f1_delta": deltas,
+        "per_field_em_delta": em_deltas,
+        "macro_f1_delta": macro_f1_delta,
+        "macro_em_delta": macro_em_delta,
+        "improved_fields": [f for f, d in deltas.items() if d > 0],
+        "regressed_fields": [f for f, d in deltas.items() if d < 0],
+        "neutral_fields": [f for f, d in deltas.items() if d == 0],
+    }

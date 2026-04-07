@@ -1,13 +1,15 @@
-"""Side-by-side comparison of base model, SFT model, and teacher (GPT-4o-mini).
+"""Side-by-side comparison of base, SFT, DPO, and teacher (GPT-4o-mini) models.
 
-Reads the JSON result files written by eval_base_model.py, eval_sft.py, and
-eval_teacher.py, then prints a comparison table and writes a summary JSON.
+Reads the JSON result files written by eval_base_model.py, eval_sft.py,
+eval_teacher.py, and optionally eval_sft.py --model-dir checkpoints/dpo-merged.
 
 Usage:
     python scripts/compare_evals.py
+    python scripts/compare_evals.py --dpo data/eval/dpo_eval_results.json
     python scripts/compare_evals.py \
         --base    data/eval/base_eval_results.json \
         --sft     data/eval/sft_eval_results.json \
+        --dpo     data/eval/dpo_eval_results.json \
         --teacher data/eval/teacher_eval_results.json
 """
 
@@ -22,6 +24,7 @@ RESULTS_DIR = Path("data/eval")
 DEFAULT_PATHS = {
     "base":    RESULTS_DIR / "base_eval_results.json",
     "sft":     RESULTS_DIR / "sft_eval_results.json",
+    "dpo":     RESULTS_DIR / "dpo_eval_results.json",
     "teacher": RESULTS_DIR / "teacher_eval_results.json",
 }
 
@@ -134,7 +137,7 @@ def print_comparison(results: dict[str, dict]) -> None:
 
     print("=" * (28 + col_w * len(labels) + 2 * len(labels)))
 
-    # Delta table (SFT vs base, SFT vs teacher)
+    # Delta table (SFT vs base, DPO vs SFT, gap to teacher)
     if "base" in results and "sft" in results:
         sft_em = macro_em(results["sft"]["metrics"])
         base_em = macro_em(results["base"]["metrics"])
@@ -148,24 +151,40 @@ def print_comparison(results: dict[str, dict]) -> None:
         print(f"    Macro EM Δ  {sign_em}{delta_em:.1%}")
         print(f"    Macro F1 Δ  {sign_f1}{delta_f1:.1%}")
 
-    if "teacher" in results and "sft" in results:
+    if "sft" in results and "dpo" in results:
         sft_f1 = macro_f1(results["sft"]["metrics"])
-        teacher_f1 = macro_f1(results["teacher"]["metrics"])
-        gap = teacher_f1 - sft_f1
-        pct_closed = (1 - gap / teacher_f1) * 100 if teacher_f1 > 0 else 0
-        print(f"\n  Gap to teacher (macro F1): {gap:.1%}  ({pct_closed:.0f}% of teacher F1 reached)")
+        dpo_f1 = macro_f1(results["dpo"]["metrics"])
+        delta = dpo_f1 - sft_f1
+        sign = "+" if delta >= 0 else ""
+        print(f"\n  DPO vs SFT (macro F1 Δ):  {sign}{delta:.1%}", end="")
+        if delta < 0:
+            print("  ← alignment tax!", end="")
+        print()
+
+    if "teacher" in results:
+        best_label = "dpo" if "dpo" in results else "sft" if "sft" in results else None
+        if best_label:
+            best_f1 = macro_f1(results[best_label]["metrics"])
+            teacher_f1 = macro_f1(results["teacher"]["metrics"])
+            gap = teacher_f1 - best_f1
+            pct_closed = (1 - gap / teacher_f1) * 100 if teacher_f1 > 0 else 0
+            print(f"\n  Gap to teacher ({best_label} macro F1): {gap:.1%}  ({pct_closed:.0f}% of teacher F1 reached)")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base",    default=str(DEFAULT_PATHS["base"]))
     parser.add_argument("--sft",     default=str(DEFAULT_PATHS["sft"]))
+    parser.add_argument("--dpo",     default=str(DEFAULT_PATHS["dpo"]))
     parser.add_argument("--teacher", default=str(DEFAULT_PATHS["teacher"]))
     parser.add_argument("--output",  default=str(RESULTS_DIR / "comparison_summary.json"))
     args = parser.parse_args()
 
     results: dict[str, dict] = {}
-    for label, path_str in [("base", args.base), ("sft", args.sft), ("teacher", args.teacher)]:
+    for label, path_str in [
+        ("base", args.base), ("sft", args.sft),
+        ("dpo", args.dpo), ("teacher", args.teacher),
+    ]:
         r = load_result(Path(path_str))
         if r:
             results[label] = r

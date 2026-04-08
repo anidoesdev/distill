@@ -94,6 +94,68 @@ class DPOConfig(BaseModel):
     run_name: str = "extractor-dpo"
 
 
+class QuantizationConfig(BaseModel):
+    """Configuration for post-training quantization (session 19/20).
+
+    Two targets:
+      AWQ  — fast inference on Ampere+ GPUs via activation-aware weight scaling
+      GGUF — portable CPU+GPU inference via llama.cpp
+
+    The merged model (BF16, ~6 GB) is the input for both.
+    """
+
+    model_dir: str = Field(
+        default="checkpoints/dpo-merged",
+        description="Path to the merged BF16 model to quantize.",
+    )
+
+    # ── AWQ ───────────────────────────────────────────────────────────────────
+    awq_output_dir: str = "checkpoints/awq"
+    awq_bits: int = Field(
+        default=4,
+        description="Bit-width for AWQ. 4 is standard; 8 available but less common.",
+    )
+    awq_group_size: int = Field(
+        default=128,
+        description="Number of weights per quantization group. Smaller = more accurate, "
+                    "slightly larger model. 128 is the AWQ paper default.",
+    )
+    awq_zero_point: bool = Field(
+        default=True,
+        description="Use zero-point quantization (asymmetric). Slightly more accurate "
+                    "than symmetric (zero_point=False) at no size cost.",
+    )
+    awq_calib_data: str = Field(
+        default="data/processed/hf_dataset/train",
+        description="HF dataset directory used for calibration (128 samples, no labels needed).",
+    )
+    awq_calib_samples: int = Field(
+        default=128,
+        description="Number of calibration examples. 128 is sufficient to find salient channels.",
+    )
+    awq_calib_seq_len: int = Field(
+        default=512,
+        description="Sequence length for calibration. Longer = more accurate channel detection, "
+                    "but requires more VRAM during calibration.",
+    )
+
+    # ── GGUF ──────────────────────────────────────────────────────────────────
+    gguf_output_dir: str = "checkpoints/gguf"
+    gguf_type: Literal["Q4_K_M", "Q5_K_M", "Q8_0", "Q4_0"] = Field(
+        default="Q4_K_M",
+        description="GGUF quantization type. "
+                    "Q4_K_M: 4-bit k-quant (attention Q6, MLP Q4). Recommended. "
+                    "Q5_K_M: 5-bit, better quality, larger. "
+                    "Q8_0: near-lossless, 2× compression only. "
+                    "Q4_0: simple 4-bit, legacy.",
+    )
+    llama_cpp_dir: str = Field(
+        default="./llama.cpp",
+        description="Path to llama.cpp repository (cloned separately). "
+                    "Needed for convert-hf-to-gguf.py and llama-quantize.",
+    )
+
+
 class LoRAConfig(BaseModel):
     r: int = Field(default=16, description="Rank of the LoRA matrices. Higher = more capacity, more VRAM.")
     lora_alpha: int = Field(

@@ -1,18 +1,32 @@
 services:
-  # vLLM model server — spun up in session 22
-  # vllm:
-  #   image: vllm/vllm-openai:latest
-  #   runtime: nvidia
-  #   environment:
-  #     - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN}
-  #   command: >
-  #     --model checkpoints/extractor-dpo-awq
-  #     --quantization awq
-  #     --max-model-len 4096
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./checkpoints:/checkpoints
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    environment:
+      - HUGGING_FACE_HUB_TOKEN=${HF_TOKEN:-}
+    command: >
+      --model /checkpoints/awq
+      --quantization awq
+      --max-model-len 1024
+      --gpu-memory-utilization 0.85
+      --served-model-name extractor
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./checkpoints:/checkpoints
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   extractor-api:
     build: .
@@ -22,6 +36,7 @@ services:
       - VLLM_HOST=vllm
       - VLLM_PORT=8000
       - LOG_LEVEL=info
-    # depends_on:
-    #   - vllm
+    depends_on:
+      vllm:
+        condition: service_healthy
     restart: unless-stopped

@@ -156,6 +156,42 @@ def run_checks(phase: str) -> int:
             "(generated in session 16)" if not pref_path.exists() else f"{pref_path.stat().st_size:,} bytes",
         )
 
+    if phase == "vllm":
+        section("vLLM phase extras")
+
+        # httpx required for the async client
+        try:
+            import httpx
+            check("httpx", True, httpx.__version__)
+        except ImportError:
+            check("httpx", False, "pip install httpx")
+            failures += 1
+
+        # AWQ checkpoint (deployment target)
+        awq_path = Path("checkpoints/awq")
+        if not check("AWQ checkpoint", awq_path.exists(),
+                     "(run quantize_awq.py)" if not awq_path.exists() else ""):
+            failures += 1
+
+        # vLLM reachability (non-fatal — vLLM may not be started yet)
+        try:
+            import urllib.request
+            from extractor.config import settings
+            url = f"{settings.vllm_base_url.rstrip('/v1')}/health"
+            urllib.request.urlopen(url, timeout=3)
+            check("vLLM server reachable", True, url)
+        except Exception:
+            # Not a failure — vLLM may be started separately
+            check("vLLM server reachable", False, "start with: docker compose up vllm")
+
+        # VLLMClient importable
+        try:
+            from extractor.model.vllm_client import VLLMClient  # noqa: F401
+            check("VLLMClient importable", True)
+        except ImportError as e:
+            check("VLLMClient importable", False, str(e))
+            failures += 1
+
     print()
     if failures == 0:
         print("All checks passed.")
@@ -167,7 +203,7 @@ def run_checks(phase: str) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", default="sft", choices=["sft", "dpo"],
+    parser.add_argument("--phase", default="sft", choices=["sft", "dpo", "vllm"],
                         help="Phase to check extras for (default: sft)")
     args = parser.parse_args()
     failures = run_checks(args.phase)

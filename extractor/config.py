@@ -29,6 +29,18 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8080)
     log_level: str = Field(default="info")
+    api_key: str = Field(
+        default="",
+        description="Bearer token required on all /api/* endpoints. "
+                    "Empty string disables auth (development only).",
+    )
+
+    # Retry+repair
+    max_retries: int = Field(
+        default=2,
+        description="Max parse-repair attempts before returning a partial result. "
+                    "Each retry costs one additional model call.",
+    )
 
     # Training
     output_dir: str = Field(default="checkpoints/")

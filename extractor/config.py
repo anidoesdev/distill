@@ -42,6 +42,14 @@ class Settings(BaseSettings):
                     "Each retry costs one additional model call.",
     )
 
+    # Guided decoding
+    use_guided_decoding: bool = Field(
+        default=False,
+        description="Pass the ExtractionResult JSON schema to vLLM as guided_json. "
+                    "Eliminates parse failures entirely. When True, max_retries is ignored. "
+                    "Requires vLLM >= 0.4.0.",
+    )
+
     # Training
     output_dir: str = Field(default="checkpoints/")
     data_dir: str = Field(default="data/")

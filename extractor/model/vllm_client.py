@@ -70,12 +70,18 @@ class VLLMClient:
         messages: list[dict[str, str]],
         max_tokens: int | None = None,
         temperature: float | None = None,
+        guided_json: dict | None = None,
     ) -> tuple[str, dict[str, Any]]:
         """Send a chat completion request and return (response_text, meta).
 
         meta keys:
             prompt_tokens, completion_tokens, total_tokens,
             finish_reason, latency_s, tokens_per_sec
+
+        guided_json: JSON schema dict passed to vLLM's guided_json parameter.
+            When set, vLLM uses outlines to constrain decoding to valid JSON
+            matching the schema — parse failures become impossible.
+            Requires vLLM >= 0.4.0.
         """
         if self._client is None:
             raise RuntimeError("Use VLLMClient as an async context manager.")
@@ -87,6 +93,8 @@ class VLLMClient:
             "temperature": temperature if temperature is not None else settings.temperature,
             "stream": False,
         }
+        if guided_json is not None:
+            payload["guided_json"] = guided_json
 
         t0 = time.perf_counter()
         try:

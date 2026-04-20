@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from extractor.api.guided import guided_extract
 from extractor.api.repair import extract_with_retry
 from extractor.config import settings
 from extractor.model.vllm_client import VLLMClient
@@ -166,17 +167,39 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
     Returns a JSON object with six fields:
       authors, methodology, datasets_used, key_findings, limitations, statistical_tests
 
-    If the model produces malformed output, up to `max_retries` repair attempts
-    are made before returning a partial result with parse_error set.
+    Two execution paths depending on settings.use_guided_decoding:
+      - False (default): calls vLLM, retries on parse failure up to max_retries times
+      - True: calls vLLM with guided_json schema constraint (no parse failures possible)
+        or falls back to in-process outlines decoding if vLLM is unavailable
     """
-    messages = build_messages(request.section_text)
-
-    async with VLLMClient() as client:
-        result, error, meta = await extract_with_retry(
-            messages,
-            client,
-            max_retries=settings.max_retries,
-        )
+    if settings.use_guided_decoding:
+        schema = ExtractionResult.model_json_schema()
+        messages = build_messages(request.section_text)
+        async with VLLMClient() as client:
+            vllm_ok = await client.health()
+            if vllm_ok:
+                raw, meta = await client.chat(
+                    messages,
+                    max_tokens=request.max_tokens,
+                    guided_json=schema,
+                )
+                result, error = ExtractionResult.from_model_output(raw)
+                meta.update({"repair_attempted": False, "repair_attempts": 0})
+            else:
+                logger.warning("vLLM unreachable, falling back to local outlines decoding")
+                result, meta = await guided_extract(
+                    request.section_text,
+                    max_tokens=request.max_tokens,
+                )
+                error = None
+    else:
+        messages = build_messages(request.section_text)
+        async with VLLMClient() as client:
+            result, error, meta = await extract_with_retry(
+                messages,
+                client,
+                max_retries=settings.max_retries,
+            )
 
     return ExtractResponse(
         extraction=result.model_dump(),

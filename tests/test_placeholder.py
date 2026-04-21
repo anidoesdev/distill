@@ -268,3 +268,84 @@ def test_degrade_preserves_schema_keys() -> None:
     for seed in range(10):
         degraded, _ = degrade(ex, rng=_random.Random(seed))
         assert set(degraded.keys()) == set(ex.keys())
+
+
+# ── Client SDK tests (session 25) ─────────────────────────────────────────────
+
+def test_client_importable() -> None:
+    from extractor.client import ExtractorClient, ExtractionResponse, BatchExtractionResponse  # noqa: F401
+
+
+def test_extraction_response_from_api_response() -> None:
+    from extractor.client import ExtractionResponse
+
+    body = {
+        "extraction": {
+            "authors": ["Alice"],
+            "methodology": "CNN",
+            "datasets_used": ["ImageNet"],
+            "key_findings": ["73% accuracy"],
+            "limitations": [],
+            "statistical_tests": [],
+        },
+        "parse_error": None,
+        "repair_attempted": False,
+        "repair_attempts": 0,
+        "latency_s": 0.42,
+        "prompt_tokens": 100,
+        "completion_tokens": 80,
+    }
+    resp = ExtractionResponse.from_api_response(body)
+    assert resp.authors == ["Alice"]
+    assert resp.methodology == "CNN"
+    assert resp.latency_s == 0.42
+    assert not resp.is_empty
+
+
+def test_extraction_response_is_empty() -> None:
+    from extractor.client import ExtractionResponse
+
+    resp = ExtractionResponse()
+    assert resp.is_empty
+
+    resp2 = ExtractionResponse(methodology="something")
+    assert not resp2.is_empty
+
+
+def test_extraction_response_from_failed_parse() -> None:
+    from extractor.client import ExtractionResponse
+
+    body = {
+        "extraction": {
+            "authors": [], "methodology": "", "datasets_used": [],
+            "key_findings": [], "limitations": [], "statistical_tests": [],
+        },
+        "parse_error": "JSONDecodeError: unexpected token",
+        "repair_attempted": True,
+        "repair_attempts": 2,
+        "latency_s": 1.2,
+        "prompt_tokens": 90,
+        "completion_tokens": 30,
+    }
+    resp = ExtractionResponse.from_api_response(body)
+    assert resp.parse_error == "JSONDecodeError: unexpected token"
+    assert resp.repair_attempted
+    assert resp.repair_attempts == 2
+    assert resp.is_empty
+
+
+def test_batch_extraction_response_success_rate() -> None:
+    from extractor.client import BatchExtractionResponse, ExtractionResponse
+
+    ok = ExtractionResponse(methodology="CNN")
+    fail = ExtractionResponse(parse_error="bad json")
+    batch = BatchExtractionResponse(results=[ok, fail], n=2, failed=1, latency_s=0.9)
+    assert batch.success_rate == 0.5
+
+
+def test_batch_router_importable() -> None:
+    from extractor.api.batch import router, BatchExtractRequest, BatchExtractResponse  # noqa: F401
+
+
+def test_auth_module_importable() -> None:
+    from extractor.api.auth import verify_api_key  # noqa: F401

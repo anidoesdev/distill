@@ -1,9 +1,10 @@
 """FastAPI application — EXTRACTOR API.
 
 Endpoints:
-  GET  /health          — liveness probe (no auth)
-  GET  /api/info        — model info + vLLM status (auth required)
-  POST /api/extract     — extract structured JSON from a paper section (auth required)
+  GET  /health               — liveness probe (no auth)
+  GET  /api/info             — model info + vLLM status (auth required)
+  POST /api/extract          — extract structured JSON from a paper section (auth required)
+  POST /api/extract/batch    — batch extraction, up to 20 sections (auth required)
 
 Run locally (no model — health endpoint only):
     uvicorn extractor.api.main:app --host 0.0.0.0 --port 8080 --reload
@@ -15,13 +16,14 @@ Run with vLLM backend:
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Annotated, AsyncGenerator
+from typing import AsyncGenerator
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
+from extractor.api.auth import verify_api_key
+from extractor.api.batch import router as batch_router
 from extractor.api.guided import guided_extract
 from extractor.api.repair import extract_with_retry
 from extractor.config import settings
@@ -32,27 +34,6 @@ from extractor.utils.logging import configure_logging, get_logger
 
 configure_logging(settings.log_level)
 logger = get_logger(__name__)
-
-# ── Auth ──────────────────────────────────────────────────────────────────────
-
-_bearer = HTTPBearer(auto_error=False)
-
-
-async def verify_api_key(
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
-) -> None:
-    """Reject requests without a valid Bearer token.
-
-    If settings.api_key is empty, auth is disabled (development mode).
-    """
-    if not settings.api_key:
-        return  # auth disabled
-    if credentials is None or credentials.credentials != settings.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing API key.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
 
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
@@ -79,6 +60,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(batch_router)
 
 
 # ── Request/response logging middleware ───────────────────────────────────────

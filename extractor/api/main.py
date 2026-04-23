@@ -5,6 +5,7 @@ Endpoints:
   GET  /api/info             — model info + vLLM status (auth required)
   POST /api/extract          — extract structured JSON from a paper section (auth required)
   POST /api/extract/batch    — batch extraction, up to 20 sections (auth required)
+  GET  /demo                 — Gradio interactive UI (no auth)
 
 Run locally (no model — health endpoint only):
     uvicorn extractor.api.main:app --host 0.0.0.0 --port 8080 --reload
@@ -62,6 +63,17 @@ app.add_middleware(
 )
 
 app.include_router(batch_router)
+
+# Gradio demo mounted at /demo — imported lazily so the API starts even if
+# gradio is not installed (it's an optional dependency for the demo only).
+try:
+    import gradio as gr
+    from demo.app import demo as gradio_demo
+
+    gr.mount_gradio_app(app, gradio_demo, path="/demo")
+    logger.info("gradio demo mounted at /demo")
+except ImportError:
+    logger.info("gradio not installed — /demo endpoint disabled")
 
 
 # ── Request/response logging middleware ───────────────────────────────────────

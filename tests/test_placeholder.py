@@ -349,3 +349,73 @@ def test_batch_router_importable() -> None:
 
 def test_auth_module_importable() -> None:
     from extractor.api.auth import verify_api_key  # noqa: F401
+
+
+# ── Demo format helper tests (session 26) ─────────────────────────────────────
+
+def test_result_to_markdown_full_result() -> None:
+    from demo.format import result_to_markdown
+    from extractor.schemas.extraction import ExtractionResult
+
+    result = ExtractionResult(
+        authors=["Alice Smith", "Bob Jones"],
+        methodology="We trained a CNN on ImageNet.",
+        datasets_used=["ImageNet"],
+        key_findings=["73% top-1 accuracy"],
+        limitations=["English only"],
+        statistical_tests=["paired t-test (p<0.001)"],
+    )
+    md = result_to_markdown(result)
+    assert "### Authors" in md
+    assert "Alice Smith" in md
+    assert "### Methodology" in md
+    assert "CNN" in md
+    assert "### Key Findings" in md
+    assert "73%" in md
+
+
+def test_result_to_markdown_empty_fields_omitted() -> None:
+    from demo.format import result_to_markdown
+    from extractor.schemas.extraction import ExtractionResult
+
+    result = ExtractionResult(methodology="SVM-based classifier.")
+    md = result_to_markdown(result)
+    assert "### Methodology" in md
+    assert "### Authors" not in md
+    assert "### Datasets Used" not in md
+
+
+def test_result_to_markdown_shows_parse_error_banner() -> None:
+    from demo.format import result_to_markdown
+    from extractor.schemas.extraction import ExtractionResult
+
+    result = ExtractionResult()
+    md = result_to_markdown(result, parse_error="JSONDecodeError: bad token")
+    assert "Parse error" in md
+    assert "JSONDecodeError" in md
+
+
+def test_result_to_markdown_totally_empty() -> None:
+    from demo.format import result_to_markdown
+    from extractor.schemas.extraction import ExtractionResult
+
+    result = ExtractionResult()
+    md = result_to_markdown(result)
+    assert "No structured information" in md
+
+
+def test_result_to_field_table_contains_all_fields() -> None:
+    from demo.format import result_to_field_table
+    from extractor.schemas.extraction import ExtractionResult
+
+    result = ExtractionResult(authors=["Alice"], methodology="CNN")
+    table = result_to_field_table(result)
+    for field in ["authors", "methodology", "datasets_used",
+                  "key_findings", "limitations", "statistical_tests"]:
+        assert field in table
+    assert "✓" in table  # present fields
+    assert "✗" in table  # absent fields
+
+
+def test_demo_format_importable() -> None:
+    from demo.format import result_to_markdown, result_to_field_table  # noqa: F401

@@ -72,8 +72,8 @@ try:
 
     gr.mount_gradio_app(app, gradio_demo, path="/demo")
     logger.info("gradio demo mounted at /demo")
-except ImportError:
-    logger.info("gradio not installed — /demo endpoint disabled")
+except Exception as _gradio_exc:
+    logger.info("gradio demo not available — /demo endpoint disabled (%s)", _gradio_exc)
 
 
 # ── Request/response logging middleware ───────────────────────────────────────

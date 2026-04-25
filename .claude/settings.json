@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python -c \"import json; s=json.load\\(open\\('d:/distill/schedule.json'\\)\\); print\\(type\\(s\\)\\); print\\(list\\(s.keys\\(\\)\\)[:5] if isinstance\\(s, dict\\) else s[:2]\\)\")",
-      "Bash(python -c \"import json; s=json.load\\(open\\('d:/distill/schedule.json'\\)\\); sessions=s['sessions']; print\\(type\\(sessions\\)\\); k=list\\(sessions.keys\\(\\)\\)[:5]; print\\(k\\); print\\(json.dumps\\(sessions.get\\('12'\\) or sessions.get\\(12\\) or sessions[k[0]], indent=2\\)\\)\")"
+      "Bash(python -c \"import json; s=json.load\\(open\\('d:/distill/schedule.json'\\)\\); sessions=s['sessions']; print\\(type\\(sessions\\)\\); k=list\\(sessions.keys\\(\\)\\)[:5]; print\\(k\\); print\\(json.dumps\\(sessions.get\\('12'\\) or sessions.get\\(12\\) or sessions[k[0]], indent=2\\)\\)\")",
+      "Bash(python -m pytest tests/test_api.py::test_health_returns_200 -v --tb=long)"
     ]
   }
 }

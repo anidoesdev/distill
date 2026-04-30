@@ -1,7 +1,10 @@
 """FastAPI application — EXTRACTOR API.
 
 Endpoints:
-  GET  /health               — liveness probe (no auth)
+  GET  /health/live          — liveness probe (no auth)
+  GET  /health/ready         — readiness probe, checks vLLM (no auth)
+  GET  /health               — backwards-compatible alias for /health/live
+  GET  /metrics              — Prometheus metrics (no auth)
   GET  /api/info             — model info + vLLM status (auth required)
   POST /api/extract          — extract structured JSON from a paper section (auth required)
   POST /api/extract/batch    — batch extraction, up to 20 sections (auth required)
@@ -26,12 +29,14 @@ from pydantic import BaseModel, Field
 from extractor.api.auth import verify_api_key
 from extractor.api.batch import router as batch_router
 from extractor.api.guided import guided_extract
+from extractor.api.health import router as health_router
 from extractor.api.repair import extract_with_retry
 from extractor.config import settings
 from extractor.model.vllm_client import VLLMClient
 from extractor.prompt import build_messages
 from extractor.schemas.extraction import ExtractionResult
 from extractor.utils.logging import configure_logging, get_logger
+from extractor.utils.metrics import METRICS
 
 configure_logging(settings.log_level)
 logger = get_logger(__name__)
@@ -62,6 +67,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(health_router)
 app.include_router(batch_router)
 
 # Gradio demo mounted at /demo — imported lazily so the API starts even if
@@ -76,25 +82,59 @@ except Exception as _gradio_exc:
     logger.info("gradio demo not available — /demo endpoint disabled (%s)", _gradio_exc)
 
 
-# ── Request/response logging middleware ───────────────────────────────────────
+# ── Request/response logging + metrics middleware ─────────────────────────────
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def log_and_instrument(request: Request, call_next):
     request_id = str(uuid.uuid4())[:8]
+    path = request.url.path
     t0 = time.perf_counter()
-    response = await call_next(request)
+
+    METRICS.active_requests.labels(endpoint=path).inc()
+    try:
+        response = await call_next(request)
+    finally:
+        METRICS.active_requests.labels(endpoint=path).dec()
+
     elapsed = time.perf_counter() - t0
+    status = str(response.status_code)
+
+    METRICS.requests_total.labels(endpoint=path, status=status).inc()
+    METRICS.request_latency.labels(endpoint=path).observe(elapsed)
+
     logger.info(
         "http request",
         extra={
             "request_id": request_id,
             "method": request.method,
-            "path": request.url.path,
+            "path": path,
             "status": response.status_code,
             "latency_s": round(elapsed, 3),
         },
     )
     return response
+
+
+# ── Prometheus /metrics endpoint ──────────────────────────────────────────────
+
+@app.get("/metrics", include_in_schema=False)
+async def prometheus_metrics():
+    """Expose Prometheus metrics in text format.
+
+    Returns 503 with a plain-text message if prometheus_client is not installed.
+    """
+    if not METRICS.prometheus_available:
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(
+            "prometheus_client not installed. pip install prometheus-client",
+            status_code=503,
+        )
+    from fastapi.responses import Response as FastAPIResponse
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    return FastAPIResponse(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -196,11 +236,19 @@ async def extract(request: ExtractRequest) -> ExtractResponse:
                 max_retries=settings.max_retries,
             )
 
+    if error:
+        METRICS.parse_failures_total.inc()
+    n_repairs = meta.get("repair_attempts", 0)
+    if n_repairs:
+        METRICS.repair_attempts_total.inc(n_repairs)
+    if meta.get("latency_s"):
+        METRICS.vllm_latency.observe(meta["latency_s"])
+
     return ExtractResponse(
         extraction=result.model_dump(),
         parse_error=error,
         repair_attempted=meta.get("repair_attempted", False),
-        repair_attempts=meta.get("repair_attempts", 0),
+        repair_attempts=n_repairs,
         latency_s=meta.get("latency_s", 0.0),
         prompt_tokens=meta.get("prompt_tokens", 0),
         completion_tokens=meta.get("completion_tokens", 0),

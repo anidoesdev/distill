@@ -143,14 +143,18 @@ def main() -> None:
             cat_target = per_cat
 
             print(f"\n[{cat}] fetching up to {cat_target} records...")
+            backoff = 15
 
             while cat_written < cat_target and total_written < args.n:
                 try:
-                    records = fetch_page(cat, start=start, max_results=100)
+                    records = fetch_page(cat, start=start, max_results=50)
                 except requests.RequestException as e:
-                    print(f"  Request failed: {e}. Retrying in 5s...")
-                    time.sleep(5)
+                    wait = min(backoff, 120)
+                    print(f"  Request failed: {e}. Retrying in {wait}s...")
+                    time.sleep(wait)
+                    backoff = min(backoff * 2, 120)
                     continue
+                backoff = 15
 
                 if not records:
                     print(f"  No more results at start={start}")

@@ -1,0 +1,7 @@
+{
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "per_device_train_batch_size": 2,
+  "gradient_accumulation_steps": 8,
+  "packing": false,
+  "use_wandb": false
+}

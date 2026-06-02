@@ -14,6 +14,10 @@ import asyncio
 import os
 from typing import Literal
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from extractor.prompt import build_messages

@@ -57,8 +57,17 @@ def run_eval(model_dir: str, use_adapter: bool, limit: int | None) -> dict:
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
     if use_adapter:
+        import json as _json
         from peft import PeftModel
         from transformers import BitsAndBytesConfig
+
+        # Read base model from the adapter's own config to avoid hardcoded mismatches
+        adapter_cfg_path = Path(model_dir) / "adapter_config.json"
+        if adapter_cfg_path.exists():
+            base_model_name = _json.loads(adapter_cfg_path.read_text())["base_model_name_or_path"]
+        else:
+            base_model_name = cfg.model_name
+        logger.info("resolved base model", extra={"base_model": base_model_name})
 
         bnb = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -68,7 +77,7 @@ def run_eval(model_dir: str, use_adapter: bool, limit: int | None) -> dict:
         )
         logger.info("loading base model in 4-bit for adapter inference")
         base = AutoModelForCausalLM.from_pretrained(
-            cfg.model_name,
+            base_model_name,
             quantization_config=bnb,
             device_map="auto",
             trust_remote_code=True,

@@ -137,6 +137,7 @@ def build_trainer(model, tokenizer, train_ds, val_ds, cfg: DPOConfig) -> DPOTrai
         loss_type=cfg.loss_type,
         max_prompt_length=cfg.max_prompt_length,
         max_length=cfg.max_length,
+        precompute_ref_log_probs=True,
         logging_steps=cfg.logging_steps,
         eval_strategy="steps",
         eval_steps=cfg.eval_steps,

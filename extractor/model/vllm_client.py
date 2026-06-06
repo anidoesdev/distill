@@ -139,18 +139,14 @@ class VLLMClient:
 
     async def health(self) -> bool:
         """Return True if the vLLM server is reachable and healthy."""
-        if self._client is None:
-            async with httpx.AsyncClient(base_url=self.base_url, timeout=5.0) as client:
-                try:
-                    r = await client.get("/health")
-                    return r.status_code == 200
-                except (httpx.ConnectError, httpx.TimeoutException):
-                    return False
-        try:
-            r = await self._client.get("/health")
-            return r.status_code == 200
-        except (httpx.ConnectError, httpx.TimeoutException):
-            return False
+        # vLLM health endpoint is at /health, not /v1/health
+        health_url = self.base_url.removesuffix("/v1") + "/health"
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            try:
+                r = await client.get(health_url)
+                return r.status_code == 200
+            except (httpx.ConnectError, httpx.TimeoutException):
+                return False
 
     async def list_models(self) -> list[str]:
         """Return model IDs registered with the vLLM server."""

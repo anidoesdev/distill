@@ -1,0 +1,9 @@
+{
+  "model_name": "Qwen/Qwen2.5-1.5B-Instruct",
+  "sft_adapter_dir": "checkpoints/sft",
+  "per_device_train_batch_size": 1,
+  "gradient_accumulation_steps": 16,
+  "max_prompt_length": 350,
+  "max_length": 768,
+  "use_wandb": false
+}
